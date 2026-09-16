@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -207,6 +208,52 @@ func TestIntegrationBestScoresGlobal(t *testing.T) {
 	// Verify the better scores belong to user 2
 	assertIntegrationScoreFriendCode(t, response.Scores, "test_level_002", "time_ms", integrationConfig.TestFriendCode2)
 	assertIntegrationScoreFriendCode(t, response.Scores, "test_level_002", "stars", integrationConfig.TestFriendCode2)
+}
+
+func TestIntegrationBestScoresGlobalTieBreakByEarliestSubmission(t *testing.T) {
+	db := mustConnectToIntegrationDB()
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRoutes(db))
+	defer server.Close()
+
+	solution := "VGlueSBUaWUgQnJlYWsgVGVzdA==" // "Tiny Tie Break Test" in base64
+	solutionHash := calculateIntegrationSolutionHash(solution)
+
+	request := IntegrationScoreSubmissionRequest{
+		Solution:     solution,
+		SolutionHash: solutionHash,
+		LevelID:      "tie_break_glob1",
+		LevelVersion: 1,
+		GameVersion:  "1.0.0",
+		Scores: map[string]int{
+			"fuel_rem": 12,
+		},
+	}
+
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, request); err != nil {
+		t.Fatalf("Failed to submit first tied score: %v", err)
+	}
+
+	// Ensure deterministic ordering for earliest-submission tie-break.
+	time.Sleep(10 * time.Millisecond)
+
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey2, request); err != nil {
+		t.Fatalf("Failed to submit second tied score: %v", err)
+	}
+
+	response, err := getIntegrationBestScores(server, integrationConfig.TestAPIKey, []string{"tie_break_glob1.1"}, "global")
+	if err != nil {
+		t.Fatalf("Failed to get global best scores for tie-break test: %v", err)
+	}
+
+	if response.Scope != "global" {
+		t.Errorf("Expected scope 'global', got '%s'", response.Scope)
+	}
+
+	assertIntegrationScoreCount(t, response, 1)
+	assertIntegrationScoreExists(t, response.Scores, "tie_break_glob1", "fuel_rem", 12)
+	assertIntegrationScoreFriendCode(t, response.Scores, "tie_break_glob1", "fuel_rem", integrationConfig.TestFriendCode)
 }
 
 func TestIntegrationBestScoresPersonal(t *testing.T) {

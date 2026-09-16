@@ -91,7 +91,7 @@ func authMiddleware(db *sql.DB, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("Authenticated user: %s (%s)", displayName, friendCode)
+		// log.Printf("Authenticated user: %s (%s)", displayName, friendCode)
 
 		// Store user info in request context for handler to use
 		ctx := context.WithValue(r.Context(), contextKeyUserID, userID)
