@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 func main() {
@@ -114,19 +115,31 @@ func connectToDB() (*sql.DB, error) {
 	)
 	// log.Printf("Connection String: %s", dsn)
 
+	// Build a connector whose Connect method registers a pq NoticeHandler on
+	// every individual connection in the pool, so PostgreSQL WARNING messages
+	// (e.g. unknown score types skipped during submission) reach the Go logger.
+	baseConnector, err := pq.NewConnector(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pq connector: %w", err)
+	}
+	connector := &noticeConnector{
+		Connector: baseConnector,
+		handler: func(notice *pq.Error) {
+			log.Printf("[PostgreSQL %s] %s", notice.Severity, notice.Message)
+		},
+	}
+
 	var db *sql.DB
-	var err error
 
 	// Try to connect with retries
 	const maxRetries = 5
 	for range maxRetries {
-		db, err = sql.Open("postgres", dsn)
-		if err == nil {
-			err = db.Ping()
-		}
+		db = sql.OpenDB(connector)
+		err = db.Ping()
 		if err == nil {
 			break
 		}
+		db.Close()
 		time.Sleep(2 * time.Second)
 	}
 
@@ -137,6 +150,23 @@ func connectToDB() (*sql.DB, error) {
 
 	log.Println("Connected to PostgreSQL!")
 	return db, nil
+}
+
+// noticeConnector wraps a pq.Connector and registers a pq.NoticeHandler on
+// every new driver.Conn so that PostgreSQL WARNING/NOTICE messages surface in
+// the application log.
+type noticeConnector struct {
+	*pq.Connector
+	handler func(*pq.Error)
+}
+
+func (nc *noticeConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	conn, err := nc.Connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pq.SetNoticeHandler(conn, nc.handler)
+	return conn, nil
 }
 
 // requestLogMiddleware logs the HTTP method and URL of each request
