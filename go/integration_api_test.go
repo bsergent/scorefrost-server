@@ -101,7 +101,7 @@ func TestIntegrationScoreSubmission(t *testing.T) {
 	solution := "SGVsbG8gV29ybGQ=" // "Hello World" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_001",
@@ -157,7 +157,7 @@ func TestIntegrationScoreSubmissionIgnoresUnknownScoreTypes(t *testing.T) {
 	solution := "VGVzdCBVbmtub3duIFNjb3JlIFR5cGU=" // "Test Unknown Score Type" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "unk_type_001",
@@ -203,7 +203,7 @@ func TestIntegrationBestScoresGlobal(t *testing.T) {
 	solution := "SGVsbG8gV29ybGQ=" // "Hello World" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request1 := IntegrationScoreSubmissionRequest{
+	request1 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_002",
@@ -265,7 +265,7 @@ func TestIntegrationBestScoresGlobalTieBreakByEarliestSubmission(t *testing.T) {
 	solution := "VGlueSBUaWUgQnJlYWsgVGVzdA==" // "Tiny Tie Break Test" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "tie_break_glob1",
@@ -312,7 +312,7 @@ func TestIntegrationBestScoresPersonal(t *testing.T) {
 	solution := "VGVzdCBTb2x1dGlvbg==" // "Test Solution" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_003",
@@ -363,7 +363,7 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 	solution := "U29sdXRpb24gZm9yIHBlcnNvbmFsIHNjb3BlIHRlc3Q=" // "Solution for personal scope test" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	userOneLevelA := IntegrationScoreSubmissionRequest{
+	userOneLevelA := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "pers_best_a",
@@ -375,7 +375,7 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		},
 	}
 
-	userOneLevelB := IntegrationScoreSubmissionRequest{
+	userOneLevelB := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "pers_best_b",
@@ -387,7 +387,7 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		},
 	}
 
-	userTwoBetterLevelA := IntegrationScoreSubmissionRequest{
+	userTwoBetterLevelA := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "pers_best_a",
@@ -399,7 +399,7 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		},
 	}
 
-	userTwoBetterLevelB := IntegrationScoreSubmissionRequest{
+	userTwoBetterLevelB := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "pers_best_b",
@@ -411,13 +411,13 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		},
 	}
 
-	for _, request := range []IntegrationScoreSubmissionRequest{userOneLevelA, userOneLevelB} {
+	for _, request := range []ScoreSubmissionRequest{userOneLevelA, userOneLevelB} {
 		if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, request); err != nil {
 			t.Fatalf("Failed to submit user 1 score: %v", err)
 		}
 	}
 
-	for _, request := range []IntegrationScoreSubmissionRequest{userTwoBetterLevelA, userTwoBetterLevelB} {
+	for _, request := range []ScoreSubmissionRequest{userTwoBetterLevelA, userTwoBetterLevelB} {
 		if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey2, request); err != nil {
 			t.Fatalf("Failed to submit user 2 score: %v", err)
 		}
@@ -458,7 +458,7 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 	solution := "R2xvYmFsIEJlc3QgVGVzdA==" // "Global Best Test" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	userOneWorseLevelA := IntegrationScoreSubmissionRequest{
+	userOneWorseLevelA := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "glob_best_a",
@@ -470,7 +470,7 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		},
 	}
 
-	userOneWorseLevelB := IntegrationScoreSubmissionRequest{
+	userOneWorseLevelB := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "glob_best_b",
@@ -482,7 +482,7 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		},
 	}
 
-	userTwoBetterLevelA := IntegrationScoreSubmissionRequest{
+	userTwoBetterLevelA := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "glob_best_a",
@@ -494,7 +494,7 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		},
 	}
 
-	userTwoBetterLevelB := IntegrationScoreSubmissionRequest{
+	userTwoBetterLevelB := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "glob_best_b",
@@ -506,13 +506,13 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		},
 	}
 
-	for _, request := range []IntegrationScoreSubmissionRequest{userOneWorseLevelA, userOneWorseLevelB} {
+	for _, request := range []ScoreSubmissionRequest{userOneWorseLevelA, userOneWorseLevelB} {
 		if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, request); err != nil {
 			t.Fatalf("Failed to submit user 1 score: %v", err)
 		}
 	}
 
-	for _, request := range []IntegrationScoreSubmissionRequest{userTwoBetterLevelA, userTwoBetterLevelB} {
+	for _, request := range []ScoreSubmissionRequest{userTwoBetterLevelA, userTwoBetterLevelB} {
 		if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey2, request); err != nil {
 			t.Fatalf("Failed to submit user 2 score: %v", err)
 		}
@@ -563,7 +563,7 @@ func TestIntegrationBestScoresMultipleLevels(t *testing.T) {
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
 	// Level A
-	requestA := IntegrationScoreSubmissionRequest{
+	requestA := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_A",
@@ -575,7 +575,7 @@ func TestIntegrationBestScoresMultipleLevels(t *testing.T) {
 	}
 
 	// Level B
-	requestB := IntegrationScoreSubmissionRequest{
+	requestB := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_B",
@@ -636,7 +636,7 @@ func TestIntegrationLatestVersionDetection(t *testing.T) {
 	solution := "SGVsbG8gV29ybGQ=" // "Hello World" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	requestV1 := IntegrationScoreSubmissionRequest{
+	requestV1 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_v",
@@ -648,7 +648,7 @@ func TestIntegrationLatestVersionDetection(t *testing.T) {
 	}
 
 	// Submit score for version 2 (higher version)
-	requestV2 := IntegrationScoreSubmissionRequest{
+	requestV2 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "test_level_v",
@@ -697,7 +697,7 @@ func TestIntegrationLeaderboard(t *testing.T) {
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
 	// User 1: Good score
-	request1 := IntegrationScoreSubmissionRequest{
+	request1 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "leaderboard_test",
@@ -709,7 +709,7 @@ func TestIntegrationLeaderboard(t *testing.T) {
 	}
 
 	// User 2: Better score
-	request2 := IntegrationScoreSubmissionRequest{
+	request2 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "leaderboard_test",
@@ -810,7 +810,7 @@ func TestIntegrationLeaderboardScoreTypeFiltering(t *testing.T) {
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
 	// Submit scores with multiple score types for user 1
-	request1 := IntegrationScoreSubmissionRequest{
+	request1 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "score_type_test",
@@ -823,7 +823,7 @@ func TestIntegrationLeaderboardScoreTypeFiltering(t *testing.T) {
 	}
 
 	// Submit scores with multiple score types for user 2
-	request2 := IntegrationScoreSubmissionRequest{
+	request2 := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "score_type_test",
@@ -1246,7 +1246,7 @@ func TestIntegrationLoginReclaimDeletedUser(t *testing.T) {
 	solution := "SGVsbG8gV29ybGQ=" // "Hello World" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "recovery_level",
@@ -1321,7 +1321,7 @@ func TestIntegrationResultOnlyPassCountsInBestScores(t *testing.T) {
 	solution := "UGFzc0ZhaWxBYmFuZG9uQmVzdA==" // "PassFailAbandonBest" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	base := IntegrationScoreSubmissionRequest{
+	base := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "result_best_001",
@@ -1331,7 +1331,7 @@ func TestIntegrationResultOnlyPassCountsInBestScores(t *testing.T) {
 
 	// fail: best time (lowest) — should NOT count
 	failReq := base
-	failReq.Result = "fail"
+	failReq.Result = SolutionResultFail
 	failReq.Scores = map[string]int{"time_ms": 1000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, failReq); err != nil {
 		t.Fatalf("Failed to submit fail score: %v", err)
@@ -1339,7 +1339,7 @@ func TestIntegrationResultOnlyPassCountsInBestScores(t *testing.T) {
 
 	// abandon: second-best time — should NOT count
 	abandonReq := base
-	abandonReq.Result = "abandon"
+	abandonReq.Result = SolutionResultAbandon
 	abandonReq.Scores = map[string]int{"time_ms": 2000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, abandonReq); err != nil {
 		t.Fatalf("Failed to submit abandon score: %v", err)
@@ -1347,7 +1347,7 @@ func TestIntegrationResultOnlyPassCountsInBestScores(t *testing.T) {
 
 	// pass: worst time — the ONLY one that should appear
 	passReq := base
-	passReq.Result = "pass"
+	passReq.Result = SolutionResultPass
 	passReq.Scores = map[string]int{"time_ms": 5000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, passReq); err != nil {
 		t.Fatalf("Failed to submit pass score: %v", err)
@@ -1382,7 +1382,7 @@ func TestIntegrationResultOnlyPassCountsInLeaderboard(t *testing.T) {
 	solution := "UGFzc0ZhaWxBYmFuZG9uTGVhZA==" // "PassFailAbandonLead" in base64
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
-	base := IntegrationScoreSubmissionRequest{
+	base := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "result_lb_001",
@@ -1392,7 +1392,7 @@ func TestIntegrationResultOnlyPassCountsInLeaderboard(t *testing.T) {
 
 	// fail: best time — should NOT count
 	failReq := base
-	failReq.Result = "fail"
+	failReq.Result = SolutionResultFail
 	failReq.Scores = map[string]int{"time_ms": 1000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, failReq); err != nil {
 		t.Fatalf("Failed to submit fail score: %v", err)
@@ -1400,7 +1400,7 @@ func TestIntegrationResultOnlyPassCountsInLeaderboard(t *testing.T) {
 
 	// abandon: second-best time — should NOT count
 	abandonReq := base
-	abandonReq.Result = "abandon"
+	abandonReq.Result = SolutionResultAbandon
 	abandonReq.Scores = map[string]int{"time_ms": 2000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, abandonReq); err != nil {
 		t.Fatalf("Failed to submit abandon score: %v", err)
@@ -1408,7 +1408,7 @@ func TestIntegrationResultOnlyPassCountsInLeaderboard(t *testing.T) {
 
 	// pass: worst time — the ONLY one that should appear
 	passReq := base
-	passReq.Result = "pass"
+	passReq.Result = SolutionResultPass
 	passReq.Scores = map[string]int{"time_ms": 5000}
 	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, passReq); err != nil {
 		t.Fatalf("Failed to submit pass score: %v", err)
@@ -1453,7 +1453,7 @@ func TestIntegrationOmittedResultDefaultsToPass(t *testing.T) {
 	solutionHash := calculateIntegrationSolutionHash(solution)
 
 	// No Result field set — omitted from JSON
-	request := IntegrationScoreSubmissionRequest{
+	request := ScoreSubmissionRequest{
 		Solution:     solution,
 		SolutionHash: solutionHash,
 		LevelID:      "result_omit_001",
