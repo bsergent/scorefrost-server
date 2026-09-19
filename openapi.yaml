@@ -39,7 +39,7 @@ info:
     - `user.friend_code` is a public, unique, human-readable identifier used to find players.
       Friend codes are visible in leaderboard payloads, identify the requester in returned score entries,
       and can be exchanged outside of the game to quickly find people.
-  version: 0.2.2
+  version: 0.2.3
   contact:
     name: ScoreFrost API Support
   license:
