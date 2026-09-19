@@ -8,12 +8,12 @@ Authorization: Bearer {{dev_api_key}}
   "level_version": 1,
   "game_version": "1.0.0+0001-dev",
   "solution": "SGVsbG8gV29ybGQ=",
-  "solution_hash": "47b1ccfc46209749ca88f8ee4556ef7de42cbd94e297a79b3f8efd04ce663588",
+  "solution_hash": "a703fa6a1ed216a4dd03e71bf6604eb1b349de6005d142547155630478ba585f",
   "scores": {
     "time_ms": 12500,
     "striping": 85,
     "fuel_rem": 750,
-    "stars": 3
+    "chal_cum": 3
   }
 }
 

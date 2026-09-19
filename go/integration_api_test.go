@@ -147,6 +147,51 @@ func TestIntegrationScoreSubmission(t *testing.T) {
 	}
 }
 
+func TestIntegrationScoreSubmissionIgnoresUnknownScoreTypes(t *testing.T) {
+	db := mustConnectToIntegrationDB()
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRoutes(db))
+	defer server.Close()
+
+	solution := "VGVzdCBVbmtub3duIFNjb3JlIFR5cGU=" // "Test Unknown Score Type" in base64
+	solutionHash := calculateIntegrationSolutionHash(solution)
+
+	request := IntegrationScoreSubmissionRequest{
+		Solution:     solution,
+		SolutionHash: solutionHash,
+		LevelID:      "unk_type_001",
+		LevelVersion: 1,
+		GameVersion:  "1.0.0",
+		Scores: map[string]int{
+			"time_ms": 11111,
+			"unk_met": 42,
+		},
+	}
+
+	response, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, request)
+	if err != nil {
+		t.Fatalf("Expected submission to succeed while ignoring unknown score types, got error: %v", err)
+	}
+
+	if response.SolutionID == "" {
+		t.Error("Empty solution ID returned")
+	}
+
+	bestScores, err := getIntegrationBestScores(server, integrationConfig.TestAPIKey, []string{"unk_type_001.1"}, "personal")
+	if err != nil {
+		t.Fatalf("Failed to get best scores: %v", err)
+	}
+
+	assertIntegrationScoreExists(t, bestScores.Scores, "unk_type_001", "time_ms", 11111)
+
+	for _, score := range bestScores.Scores {
+		if score.LevelID == "unk_type_001" && score.ScoreType == "unk_met" {
+			t.Fatalf("Unknown score type should have been ignored, but found persisted score: %+v", score)
+		}
+	}
+}
+
 func TestIntegrationBestScoresGlobal(t *testing.T) {
 	db := mustConnectToIntegrationDB()
 	defer db.Close()

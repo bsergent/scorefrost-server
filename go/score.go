@@ -173,9 +173,9 @@ func submitScoreHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Convert scores map to JSON array format expected by the stored procedure
-		var scoresJSON []map[string]interface{}
+		var scoresJSON []map[string]any
 		for scoreType, scoreValue := range req.Scores {
-			scoresJSON = append(scoresJSON, map[string]interface{}{
+			scoresJSON = append(scoresJSON, map[string]any{
 				"type":  scoreType,
 				"value": scoreValue,
 			})
@@ -198,11 +198,6 @@ func submitScoreHandler(db *sql.DB) http.HandlerFunc {
 		if err != nil {
 			log.Printf("Rejected solution by %s (%s) for level %s.%d. %v",
 				displayName, friendCode, req.LevelID, req.LevelVersion, err)
-			// Check if it's a score type validation error
-			if strings.Contains(err.Error(), "Invalid score type:") {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
 			http.Error(w, "Failed to save solution", http.StatusInternalServerError)
 			return
 		}
