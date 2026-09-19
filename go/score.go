@@ -202,6 +202,11 @@ func submitScoreHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		if err := updateUserActiveTime(db, userID, req.GameVersion); err != nil {
+			log.Printf("Failed to update user active time after score submission for %s (%s): %v",
+				displayName, friendCode, err)
+		}
+
 		log.Printf("Accepted solution by %s (%s) for level %s.%d. Solution ID: %s.",
 			displayName, friendCode, req.LevelID, req.LevelVersion, solutionID)
 

@@ -1,7 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 )
 
 func TestParseLevelsParameter(t *testing.T) {
@@ -137,5 +147,58 @@ func TestLeaderboardResponseStructure(t *testing.T) {
 	}
 	if len(response.Scores) != 1 {
 		t.Errorf("Expected 1 score, got %d", len(response.Scores))
+	}
+}
+
+func TestSubmitScoreHandler_TouchesActiveTimeOnSuccessfulSubmission(t *testing.T) {
+	t.Setenv("SOLUTION_SALT", "test-salt")
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock database: %v", err)
+	}
+	defer db.Close()
+
+	userID := uuid.New()
+	solution := "dGVzdA=="
+	solutionHash := fmt.Sprintf("%x", sha256.Sum256([]byte(solution+"test-salt")))
+
+	mock.ExpectQuery(`SELECT submit_solution_with_scores\(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)`).
+		WithArgs(userID, "level-1", 1, "1.0.0", solution, 1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"submit_solution_with_scores"}).AddRow("sol-123"))
+
+	mock.ExpectExec(`SELECT touch_user_active_time\(\$1, \$2\)`).
+		WithArgs(userID, "1.0.0").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	handler := submitScoreHandler(db)
+
+	body := map[string]any{
+		"level_id":      "level-1",
+		"level_version": 1,
+		"game_version":  "1.0.0",
+		"solution":      solution,
+		"solution_hash": solutionHash,
+		"scores": map[string]int{
+			"time_ms": 123,
+		},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, APIBasePath+"/score", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyUserID, UserID(userID)))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyDisplayName, DisplayName("Tester")))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyFriendCode, FriendCode("ABCD-EFGH")))
+
+	rr := httptest.NewRecorder()
+	handler(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("Expected status %d, got %d; body=%s", http.StatusCreated, rr.Code, rr.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("Unmet SQL expectations: %v", err)
 	}
 }
