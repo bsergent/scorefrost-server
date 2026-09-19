@@ -342,6 +342,7 @@ type IntegrationScoreSubmissionRequest struct {
 	LevelID      string         `json:"level_id"`
 	LevelVersion int            `json:"level_version"`
 	GameVersion  string         `json:"game_version"`
+	Result       string         `json:"result,omitempty"` // abandon, pass, or fail; omit to default to pass
 	Scores       map[string]int `json:"scores"`
 }
 

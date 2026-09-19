@@ -1306,3 +1306,173 @@ func TestIntegrationLoginReclaimDeletedUser(t *testing.T) {
 		t.Error("Reclaimed user should receive a new API key")
 	}
 }
+
+// TestIntegrationResultOnlyPassCountsInBestScores submits pass, fail, and
+// abandon attempts for the same level, with the fail and abandon scores being
+// numerically better (lower time_ms). Verifies that only the pass score appears
+// in both the personal and global best-scores responses.
+func TestIntegrationResultOnlyPassCountsInBestScores(t *testing.T) {
+	db := mustConnectToIntegrationDB()
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRoutes(db))
+	defer server.Close()
+
+	solution := "UGFzc0ZhaWxBYmFuZG9uQmVzdA==" // "PassFailAbandonBest" in base64
+	solutionHash := calculateIntegrationSolutionHash(solution)
+
+	base := IntegrationScoreSubmissionRequest{
+		Solution:     solution,
+		SolutionHash: solutionHash,
+		LevelID:      "result_best_001",
+		LevelVersion: 1,
+		GameVersion:  "1.0.0",
+	}
+
+	// fail: best time (lowest) — should NOT count
+	failReq := base
+	failReq.Result = "fail"
+	failReq.Scores = map[string]int{"time_ms": 1000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, failReq); err != nil {
+		t.Fatalf("Failed to submit fail score: %v", err)
+	}
+
+	// abandon: second-best time — should NOT count
+	abandonReq := base
+	abandonReq.Result = "abandon"
+	abandonReq.Scores = map[string]int{"time_ms": 2000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, abandonReq); err != nil {
+		t.Fatalf("Failed to submit abandon score: %v", err)
+	}
+
+	// pass: worst time — the ONLY one that should appear
+	passReq := base
+	passReq.Result = "pass"
+	passReq.Scores = map[string]int{"time_ms": 5000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, passReq); err != nil {
+		t.Fatalf("Failed to submit pass score: %v", err)
+	}
+
+	// Personal best scores: expect exactly the pass score (5000)
+	personal, err := getIntegrationBestScores(server, integrationConfig.TestAPIKey, []string{"result_best_001.1"}, "personal")
+	if err != nil {
+		t.Fatalf("Failed to get personal best scores: %v", err)
+	}
+	assertIntegrationScoreExists(t, personal.Scores, "result_best_001", "time_ms", 5000)
+
+	// Global best scores: expect exactly the pass score (5000)
+	global, err := getIntegrationBestScores(server, integrationConfig.TestAPIKey, []string{"result_best_001.1"}, "global")
+	if err != nil {
+		t.Fatalf("Failed to get global best scores: %v", err)
+	}
+	assertIntegrationScoreExists(t, global.Scores, "result_best_001", "time_ms", 5000)
+}
+
+// TestIntegrationResultOnlyPassCountsInLeaderboard submits pass, fail, and
+// abandon attempts for the same level, with the fail and abandon scores being
+// numerically better (lower time_ms). Verifies that only the pass score appears
+// in both the personal and global leaderboard responses.
+func TestIntegrationResultOnlyPassCountsInLeaderboard(t *testing.T) {
+	db := mustConnectToIntegrationDB()
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRoutes(db))
+	defer server.Close()
+
+	solution := "UGFzc0ZhaWxBYmFuZG9uTGVhZA==" // "PassFailAbandonLead" in base64
+	solutionHash := calculateIntegrationSolutionHash(solution)
+
+	base := IntegrationScoreSubmissionRequest{
+		Solution:     solution,
+		SolutionHash: solutionHash,
+		LevelID:      "result_lb_001",
+		LevelVersion: 1,
+		GameVersion:  "1.0.0",
+	}
+
+	// fail: best time — should NOT count
+	failReq := base
+	failReq.Result = "fail"
+	failReq.Scores = map[string]int{"time_ms": 1000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, failReq); err != nil {
+		t.Fatalf("Failed to submit fail score: %v", err)
+	}
+
+	// abandon: second-best time — should NOT count
+	abandonReq := base
+	abandonReq.Result = "abandon"
+	abandonReq.Scores = map[string]int{"time_ms": 2000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, abandonReq); err != nil {
+		t.Fatalf("Failed to submit abandon score: %v", err)
+	}
+
+	// pass: worst time — the ONLY one that should appear
+	passReq := base
+	passReq.Result = "pass"
+	passReq.Scores = map[string]int{"time_ms": 5000}
+	if _, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, passReq); err != nil {
+		t.Fatalf("Failed to submit pass score: %v", err)
+	}
+
+	// Personal leaderboard: expect exactly one entry with the pass score (5000)
+	personal, err := getIntegrationLeaderboard(server, integrationConfig.TestAPIKey, []string{"result_lb_001.1"}, "personal", "time_ms", 0, 10)
+	if err != nil {
+		t.Fatalf("Failed to get personal leaderboard: %v", err)
+	}
+	if len(personal.Scores) != 1 {
+		t.Fatalf("Personal leaderboard: expected 1 entry, got %d", len(personal.Scores))
+	}
+	if personal.Scores[0].BestScore != 5000 {
+		t.Errorf("Personal leaderboard: expected best_score=5000 (pass), got %d", personal.Scores[0].BestScore)
+	}
+
+	// Global leaderboard: expect exactly one entry with the pass score (5000)
+	global, err := getIntegrationLeaderboard(server, integrationConfig.TestAPIKey, []string{"result_lb_001.1"}, "global", "time_ms", 0, 10)
+	if err != nil {
+		t.Fatalf("Failed to get global leaderboard: %v", err)
+	}
+	if len(global.Scores) != 1 {
+		t.Fatalf("Global leaderboard: expected 1 entry, got %d", len(global.Scores))
+	}
+	if global.Scores[0].BestScore != 5000 {
+		t.Errorf("Global leaderboard: expected best_score=5000 (pass), got %d", global.Scores[0].BestScore)
+	}
+}
+
+// TestIntegrationOmittedResultDefaultsToPass verifies that when the result
+// field is absent from the request body, the submission is treated as a pass
+// and the score appears in the personal best-scores response.
+func TestIntegrationOmittedResultDefaultsToPass(t *testing.T) {
+	db := mustConnectToIntegrationDB()
+	defer db.Close()
+
+	server := httptest.NewServer(setupTestRoutes(db))
+	defer server.Close()
+
+	solution := "T21pdHRlZFJlc3VsdA==" // "OmittedResult" in base64
+	solutionHash := calculateIntegrationSolutionHash(solution)
+
+	// No Result field set — omitted from JSON
+	request := IntegrationScoreSubmissionRequest{
+		Solution:     solution,
+		SolutionHash: solutionHash,
+		LevelID:      "result_omit_001",
+		LevelVersion: 1,
+		GameVersion:  "1.0.0",
+		Scores:       map[string]int{"time_ms": 9999},
+	}
+
+	resp, err := submitIntegrationScore(server, integrationConfig.TestAPIKey, request)
+	if err != nil {
+		t.Fatalf("Expected submission to succeed, got: %v", err)
+	}
+	if resp.SolutionID == "" {
+		t.Fatal("Empty solution ID returned")
+	}
+
+	bestScores, err := getIntegrationBestScores(server, integrationConfig.TestAPIKey, []string{"result_omit_001.1"}, "personal")
+	if err != nil {
+		t.Fatalf("Failed to get personal best scores: %v", err)
+	}
+	assertIntegrationScoreExists(t, bestScores.Scores, "result_omit_001", "time_ms", 9999)
+}
