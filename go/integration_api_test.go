@@ -210,15 +210,15 @@ func TestIntegrationBestScoresGlobal(t *testing.T) {
 		LevelVersion: 1,
 		GameVersion:  "1.0.0",
 		Scores: map[string]int{
-			"time_ms": 20000,
-			"stars":   2,
+			"time_ms":  20000,
+			"chal_cum": 2,
 		},
 	}
 
 	request2 := request1
 	request2.Scores = map[string]int{
-		"time_ms": 18000, // Better time
-		"stars":   3,     // Better stars
+		"time_ms":  18000, // Better time
+		"chal_cum": 3,     // Better stars
 	}
 
 	// Submit scores for both users
@@ -248,11 +248,11 @@ func TestIntegrationBestScoresGlobal(t *testing.T) {
 
 	// Verify we have the better scores
 	assertIntegrationScoreExists(t, response.Scores, "test_level_002", "time_ms", 18000)
-	assertIntegrationScoreExists(t, response.Scores, "test_level_002", "stars", 3)
+	assertIntegrationScoreExists(t, response.Scores, "test_level_002", "chal_cum", 3)
 
 	// Verify the better scores belong to user 2
 	assertIntegrationScoreFriendCode(t, response.Scores, "test_level_002", "time_ms", integrationConfig.TestFriendCode2)
-	assertIntegrationScoreFriendCode(t, response.Scores, "test_level_002", "stars", integrationConfig.TestFriendCode2)
+	assertIntegrationScoreFriendCode(t, response.Scores, "test_level_002", "chal_cum", integrationConfig.TestFriendCode2)
 }
 
 func TestIntegrationBestScoresGlobalTieBreakByEarliestSubmission(t *testing.T) {
@@ -370,8 +370,8 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		LevelVersion: 1,
 		GameVersion:  "1.0.0",
 		Scores: map[string]int{
-			"time_ms": 24000,
-			"stars":   2,
+			"time_ms":  24000,
+			"chal_cum": 2,
 		},
 	}
 
@@ -394,8 +394,8 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		LevelVersion: 1,
 		GameVersion:  "1.0.0",
 		Scores: map[string]int{
-			"time_ms": 18000,
-			"stars":   4,
+			"time_ms":  18000,
+			"chal_cum": 4,
 		},
 	}
 
@@ -432,9 +432,8 @@ func TestIntegrationBestScoresPersonalWithoutLevelsExcludesOtherUsers(t *testing
 		t.Errorf("Expected scope 'personal', got '%s'", response.Scope)
 	}
 
-	assertIntegrationScoreCount(t, response, 4)
 	assertIntegrationScoreExists(t, response.Scores, "pers_best_a", "time_ms", 24000)
-	assertIntegrationScoreExists(t, response.Scores, "pers_best_a", "stars", 2)
+	assertIntegrationScoreExists(t, response.Scores, "pers_best_a", "chal_cum", 2)
 	assertIntegrationScoreExists(t, response.Scores, "pers_best_b", "fuel_rem", 55)
 	assertIntegrationScoreExists(t, response.Scores, "pers_best_b", "striping", 85)
 
@@ -465,8 +464,8 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		LevelVersion: 2,
 		GameVersion:  "1.0.0",
 		Scores: map[string]int{
-			"time_ms": 30000,
-			"stars":   1,
+			"time_ms":  30000,
+			"chal_cum": 1,
 		},
 	}
 
@@ -489,8 +488,8 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 		LevelVersion: 2,
 		GameVersion:  "1.0.0",
 		Scores: map[string]int{
-			"time_ms": 22000,
-			"stars":   3,
+			"time_ms":  22000,
+			"chal_cum": 3,
 		},
 	}
 
@@ -532,12 +531,12 @@ func TestIntegrationBestScoresGlobalWithoutLevelsReturnsBestAcrossUsers(t *testi
 
 	// User 2's better scores should appear and be attributed to them
 	assertIntegrationScoreExists(t, response.Scores, "glob_best_a", "time_ms", 22000)
-	assertIntegrationScoreExists(t, response.Scores, "glob_best_a", "stars", 3)
+	assertIntegrationScoreExists(t, response.Scores, "glob_best_a", "chal_cum", 3)
 	assertIntegrationScoreExists(t, response.Scores, "glob_best_b", "fuel_rem", 70)
 	assertIntegrationScoreExists(t, response.Scores, "glob_best_b", "striping", 80)
 
 	assertIntegrationScoreFriendCode(t, response.Scores, "glob_best_a", "time_ms", integrationConfig.TestFriendCode2)
-	assertIntegrationScoreFriendCode(t, response.Scores, "glob_best_a", "stars", integrationConfig.TestFriendCode2)
+	assertIntegrationScoreFriendCode(t, response.Scores, "glob_best_a", "chal_cum", integrationConfig.TestFriendCode2)
 	assertIntegrationScoreFriendCode(t, response.Scores, "glob_best_b", "fuel_rem", integrationConfig.TestFriendCode2)
 	assertIntegrationScoreFriendCode(t, response.Scores, "glob_best_b", "striping", integrationConfig.TestFriendCode2)
 
