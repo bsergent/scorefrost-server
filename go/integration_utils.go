@@ -336,69 +336,13 @@ func makeAuthenticatedIntegrationRequest(server *httptest.Server, method, path s
 }
 
 // Score submission types for integration tests
-type IntegrationScoreSubmissionRequest struct {
-	Solution     string         `json:"solution"`
-	SolutionHash string         `json:"solution_hash"`
-	LevelID      string         `json:"level_id"`
-	LevelVersion int            `json:"level_version"`
-	GameVersion  string         `json:"game_version"`
-	Scores       map[string]int `json:"scores"`
-}
-
-type IntegrationSolution struct {
-	Message    string `json:"message,omitempty"`
-	SolutionID string `json:"solution_id"`
-}
-
-type IntegrationBestScoreEntry struct {
-	LevelID      string `json:"level_id"`
-	LevelVersion int    `json:"level_version"`
-	ScoreType    string `json:"score_type"`
-	BestScore    int    `json:"best_score"`
-	UserID       string `json:"user_id"`
-	DisplayName  string `json:"display_name"`
-	FriendCode   string `json:"friend_code"`
-}
-
-type IntegrationBestScoresResponse struct {
-	Message string                      `json:"message,omitempty"`
-	Scores  []IntegrationBestScoreEntry `json:"scores"`
-	Count   int                         `json:"count"`
-	Scope   string                      `json:"scope"`
-}
-
-type IntegrationLeaderboardEntry struct {
-	Rank         int    `json:"rank"`
-	LevelID      string `json:"level_id"`
-	LevelVersion int    `json:"level_version"`
-	ScoreType    string `json:"score_type"`
-	BestScore    int    `json:"best_score"`
-	UserID       string `json:"user_id"`
-	DisplayName  string `json:"display_name"`
-	FriendCode   string `json:"friend_code"`
-}
-
-type IntegrationPaginationInfo struct {
-	Offset int `json:"offset"`
-	Size   int `json:"size"`
-	Total  int `json:"total"`
-}
-
-type IntegrationLeaderboardResponse struct {
-	Message    string                        `json:"message,omitempty"`
-	Scores     []IntegrationLeaderboardEntry `json:"scores"`
-	Count      int                           `json:"count"`
-	Scope      string                        `json:"scope"`
-	Pagination IntegrationPaginationInfo     `json:"pagination"`
-}
-
-func submitIntegrationScore(server *httptest.Server, apiKey string, request IntegrationScoreSubmissionRequest) (*IntegrationSolution, error) {
-	var response IntegrationSolution
+func submitIntegrationScore(server *httptest.Server, apiKey string, request ScoreSubmissionRequest) (*Solution, error) {
+	var response Solution
 	err := makeAuthenticatedIntegrationRequest(server, "PUT", APIBasePath+"/score", apiKey, request, &response)
 	return &response, err
 }
 
-func getIntegrationBestScores(server *httptest.Server, apiKey string, levels []string, scope string) (*IntegrationBestScoresResponse, error) {
+func getIntegrationBestScores(server *httptest.Server, apiKey string, levels []string, scope string) (*BestScoresResponse, error) {
 	// Build query parameters
 	params := url.Values{}
 	if len(levels) > 0 {
@@ -413,12 +357,12 @@ func getIntegrationBestScores(server *httptest.Server, apiKey string, levels []s
 		path += "?" + encoded
 	}
 
-	var response IntegrationBestScoresResponse
+	var response BestScoresResponse
 	err := makeAuthenticatedIntegrationRequest(server, "GET", path, apiKey, nil, &response)
 	return &response, err
 }
 
-func getIntegrationLeaderboard(server *httptest.Server, apiKey string, levels []string, scope string, scoreType string, offset int, size int) (*IntegrationLeaderboardResponse, error) {
+func getIntegrationLeaderboard(server *httptest.Server, apiKey string, levels []string, scope string, scoreType string, offset int, size int) (*LeaderboardResponse, error) {
 	// Build query parameters
 	params := url.Values{}
 	params.Set("levels", strings.Join(levels, ","))
@@ -433,7 +377,7 @@ func getIntegrationLeaderboard(server *httptest.Server, apiKey string, levels []
 
 	path := APIBasePath + "/score/leaderboard?" + params.Encode()
 
-	var response IntegrationLeaderboardResponse
+	var response LeaderboardResponse
 	err := makeAuthenticatedIntegrationRequest(server, "GET", path, apiKey, nil, &response)
 	return &response, err
 }
@@ -446,7 +390,7 @@ func calculateIntegrationSolutionHash(solution string) string {
 }
 
 // Test assertion helpers for integration tests
-func assertIntegrationScoreExists(t *testing.T, scores []IntegrationBestScoreEntry, levelID string, scoreType string, expectedScore int) {
+func assertIntegrationScoreExists(t *testing.T, scores []BestScoreEntry, levelID string, scoreType string, expectedScore int) {
 	for _, score := range scores {
 		if score.LevelID == levelID && score.ScoreType == scoreType {
 			if score.BestScore != expectedScore {
@@ -458,7 +402,7 @@ func assertIntegrationScoreExists(t *testing.T, scores []IntegrationBestScoreEnt
 	t.Errorf("Score not found for %s/%s", levelID, scoreType)
 }
 
-func assertIntegrationScoreCount(t *testing.T, response *IntegrationBestScoresResponse, expectedCount int) {
+func assertIntegrationScoreCount(t *testing.T, response *BestScoresResponse, expectedCount int) {
 	if response.Count != expectedCount {
 		t.Errorf("Expected count %d, got %d", expectedCount, response.Count)
 	}
@@ -467,7 +411,7 @@ func assertIntegrationScoreCount(t *testing.T, response *IntegrationBestScoresRe
 	}
 }
 
-func assertIntegrationScoreFriendCode(t *testing.T, scores []IntegrationBestScoreEntry, levelID string, scoreType string, expectedFriendCode string) {
+func assertIntegrationScoreFriendCode(t *testing.T, scores []BestScoreEntry, levelID string, scoreType string, expectedFriendCode string) {
 	for _, score := range scores {
 		if score.LevelID == levelID && score.ScoreType == scoreType {
 			if score.FriendCode != expectedFriendCode {

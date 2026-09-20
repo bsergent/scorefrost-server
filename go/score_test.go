@@ -1,7 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 )
 
 func TestParseLevelsParameter(t *testing.T) {
@@ -137,5 +147,206 @@ func TestLeaderboardResponseStructure(t *testing.T) {
 	}
 	if len(response.Scores) != 1 {
 		t.Errorf("Expected 1 score, got %d", len(response.Scores))
+	}
+}
+
+func TestMapSolutionResultToInteger(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       SolutionResult
+		expected    int
+		expectError bool
+	}{
+		{name: "abandon", input: SolutionResultAbandon, expected: 0},
+		{name: "pass", input: SolutionResultPass, expected: 1},
+		{name: "fail", input: SolutionResultFail, expected: 2},
+		{name: "unknown", input: "invalid", expectError: true},
+		{name: "empty string", input: "", expectError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mapSolutionResultToInteger(tt.input)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error for input %q but got none (result=%d)", tt.input, result)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error for input %q: %v", tt.input, err)
+				return
+			}
+			if result != tt.expected {
+				t.Errorf("Expected %d for input %q, got %d", tt.expected, tt.input, result)
+			}
+		})
+	}
+}
+
+// TestSubmitScoreHandler_ResultFieldPassedToStoredProcedure verifies that the
+// result integer derived from ScoreSubmissionRequest.Result is forwarded to the
+// stored procedure (arg $6). Tests abandon, pass, and fail explicitly.
+func TestSubmitScoreHandler_ResultFieldPassedToStoredProcedure(t *testing.T) {
+	t.Setenv("SOLUTION_SALT", "test-salt")
+
+	cases := []struct {
+		result      SolutionResult
+		expectedInt int
+	}{
+		{SolutionResultPass, 1},
+		{SolutionResultFail, 2},
+		{SolutionResultAbandon, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.result), func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("Failed to create mock database: %v", err)
+			}
+			defer db.Close()
+
+			userID := uuid.New()
+			solution := "dGVzdA=="
+			solutionHash := fmt.Sprintf("%x", sha256.Sum256([]byte(solution+"test-salt")))
+
+			mock.ExpectQuery(`SELECT submit_solution_with_scores\(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)`).
+				WithArgs(userID, "level-1", 1, "1.0.0", solution, tc.expectedInt, sqlmock.AnyArg()).
+				WillReturnRows(sqlmock.NewRows([]string{"submit_solution_with_scores"}).AddRow("sol-456"))
+
+			handler := submitScoreHandler(db)
+
+			body := map[string]any{
+				"level_id":      "level-1",
+				"level_version": 1,
+				"game_version":  "1.0.0",
+				"result":        string(tc.result),
+				"solution":      solution,
+				"solution_hash": solutionHash,
+				"scores":        map[string]int{"time_ms": 100},
+			}
+			bodyJSON, _ := json.Marshal(body)
+
+			req := httptest.NewRequest(http.MethodPut, APIBasePath+"/score", bytes.NewBuffer(bodyJSON))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(context.WithValue(req.Context(), contextKeyUserID, UserID(userID)))
+			req = req.WithContext(context.WithValue(req.Context(), contextKeyDisplayName, DisplayName("Tester")))
+			req = req.WithContext(context.WithValue(req.Context(), contextKeyFriendCode, FriendCode("ABCD-EFGH")))
+
+			rr := httptest.NewRecorder()
+			handler(rr, req)
+
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("Expected status %d, got %d; body=%s", http.StatusCreated, rr.Code, rr.Body.String())
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("Unmet SQL expectations: %v", err)
+			}
+		})
+	}
+}
+
+// TestSubmitScoreHandler_OmittedResultDefaultsToPass verifies that when the
+// result field is absent from the request body, the stored procedure receives 1
+// (pass) as the result argument.
+func TestSubmitScoreHandler_OmittedResultDefaultsToPass(t *testing.T) {
+	t.Setenv("SOLUTION_SALT", "test-salt")
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock database: %v", err)
+	}
+	defer db.Close()
+
+	userID := uuid.New()
+	solution := "dGVzdA=="
+	solutionHash := fmt.Sprintf("%x", sha256.Sum256([]byte(solution+"test-salt")))
+
+	// Expect result=1 (pass) even though "result" is absent from the body
+	mock.ExpectQuery(`SELECT submit_solution_with_scores\(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)`).
+		WithArgs(userID, "level-1", 1, "1.0.0", solution, 1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"submit_solution_with_scores"}).AddRow("sol-789"))
+
+	handler := submitScoreHandler(db)
+
+	// No "result" key in the body
+	body := map[string]any{
+		"level_id":      "level-1",
+		"level_version": 1,
+		"game_version":  "1.0.0",
+		"solution":      solution,
+		"solution_hash": solutionHash,
+		"scores":        map[string]int{"time_ms": 100},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, APIBasePath+"/score", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyUserID, UserID(userID)))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyDisplayName, DisplayName("Tester")))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyFriendCode, FriendCode("ABCD-EFGH")))
+
+	rr := httptest.NewRecorder()
+	handler(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("Expected status %d, got %d; body=%s", http.StatusCreated, rr.Code, rr.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("Unmet SQL expectations: %v", err)
+	}
+}
+
+func TestSubmitScoreHandler_TouchesActiveTimeOnSuccessfulSubmission(t *testing.T) {
+	t.Setenv("SOLUTION_SALT", "test-salt")
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Failed to create mock database: %v", err)
+	}
+	defer db.Close()
+
+	userID := uuid.New()
+	solution := "dGVzdA=="
+	solutionHash := fmt.Sprintf("%x", sha256.Sum256([]byte(solution+"test-salt")))
+
+	mock.ExpectQuery(`SELECT submit_solution_with_scores\(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)`).
+		WithArgs(userID, "level-1", 1, "1.0.0", solution, 1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"submit_solution_with_scores"}).AddRow("sol-123"))
+
+	mock.ExpectExec(`SELECT touch_user_active_time\(\$1, \$2\)`).
+		WithArgs(userID, "1.0.0").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	handler := submitScoreHandler(db)
+
+	body := map[string]any{
+		"level_id":      "level-1",
+		"level_version": 1,
+		"game_version":  "1.0.0",
+		"solution":      solution,
+		"solution_hash": solutionHash,
+		"scores": map[string]int{
+			"time_ms": 123,
+		},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, APIBasePath+"/score", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyUserID, UserID(userID)))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyDisplayName, DisplayName("Tester")))
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyFriendCode, FriendCode("ABCD-EFGH")))
+
+	rr := httptest.NewRecorder()
+	handler(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("Expected status %d, got %d; body=%s", http.StatusCreated, rr.Code, rr.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("Unmet SQL expectations: %v", err)
 	}
 }

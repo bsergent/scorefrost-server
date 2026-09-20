@@ -12,11 +12,20 @@ import (
 	"strings"
 )
 
+type SolutionResult string
+
+const (
+	SolutionResultAbandon SolutionResult = "abandon"
+	SolutionResultPass    SolutionResult = "pass"
+	SolutionResultFail    SolutionResult = "fail"
+)
+
 // ScoreSubmissionRequest represents the JSON body for score submission
 type ScoreSubmissionRequest struct {
 	LevelID      string         `json:"level_id"`
 	LevelVersion int            `json:"level_version"`
 	GameVersion  string         `json:"game_version"`
+	Result       SolutionResult `json:"result"`
 	Solution     string         `json:"solution"`      // base64 encoded solution bytes
 	SolutionHash string         `json:"solution_hash"` // salted hash of solution
 	Scores       map[string]int `json:"scores"`        // score type -> score value
@@ -59,6 +68,34 @@ type LeaderboardResponse struct {
 	Count      int                `json:"count"`
 	Scope      string             `json:"scope"`
 	Pagination PaginationInfo     `json:"pagination"`
+}
+
+// Converts a `SolutionResult` to its corresponding integer representation
+func mapSolutionResultToInteger(result SolutionResult) (int, error) {
+	switch result {
+	case SolutionResultAbandon:
+		return 0, nil
+	case SolutionResultPass:
+		return 1, nil
+	case SolutionResultFail:
+		return 2, nil
+	default:
+		return -1, fmt.Errorf("unknown solution result: %s", result)
+	}
+}
+
+// Converts an integer representation to its corresponding `SolutionResult`
+func mapIntegerToSolutionResult(result int) (SolutionResult, error) {
+	switch result {
+	case 0:
+		return SolutionResultAbandon, nil
+	case 1:
+		return SolutionResultPass, nil
+	case 2:
+		return SolutionResultFail, nil
+	default:
+		return "", fmt.Errorf("unknown solution result: %d", result)
+	}
 }
 
 // parseLevelsParameter parses the levels CSV parameter and returns JSON array
@@ -173,9 +210,9 @@ func submitScoreHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Convert scores map to JSON array format expected by the stored procedure
-		var scoresJSON []map[string]interface{}
+		var scoresJSON []map[string]any
 		for scoreType, scoreValue := range req.Scores {
-			scoresJSON = append(scoresJSON, map[string]interface{}{
+			scoresJSON = append(scoresJSON, map[string]any{
 				"type":  scoreType,
 				"value": scoreValue,
 			})
@@ -188,23 +225,31 @@ func submitScoreHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		resultInt, err := mapSolutionResultToInteger(req.Result)
+		if err != nil {
+			// Default to "pass" if result is unknown for backwards compatibility
+			log.Printf("Unknown solution result '%s' from user %s (%s) for level %s.%d. Defaulting to 'pass'.",
+				req.Result, displayName, friendCode, req.LevelID, req.LevelVersion)
+			resultInt, _ = mapSolutionResultToInteger(SolutionResultPass)
+		}
+
 		// Call stored procedure to submit solution with scores
 		var solutionID string
 		err = db.QueryRow(`
 			SELECT submit_solution_with_scores($1, $2, $3, $4, $5, $6, $7)
-		`, userID, req.LevelID, req.LevelVersion, req.GameVersion, req.Solution, 1, string(scoresJSONBytes)).
+		`, userID, req.LevelID, req.LevelVersion, req.GameVersion, req.Solution, resultInt, string(scoresJSONBytes)).
 			Scan(&solutionID)
 
 		if err != nil {
 			log.Printf("Rejected solution by %s (%s) for level %s.%d. %v",
 				displayName, friendCode, req.LevelID, req.LevelVersion, err)
-			// Check if it's a score type validation error
-			if strings.Contains(err.Error(), "Invalid score type:") {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
 			http.Error(w, "Failed to save solution", http.StatusInternalServerError)
 			return
+		}
+
+		if err := updateUserActiveTime(db, userID, req.GameVersion); err != nil {
+			log.Printf("Failed to update user active time after score submission for %s (%s): %v",
+				displayName, friendCode, err)
 		}
 
 		log.Printf("Accepted solution by %s (%s) for level %s.%d. Solution ID: %s.",
